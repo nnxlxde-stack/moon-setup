@@ -17,8 +17,10 @@ if (-not $SkipStdlib) {
 }
 Install-MoonUserPath
 
-Write-Host "`nMoon installed:" -ForegroundColor Green
-Write-Host "  moon.exe  -> $script:MoonExePath"
-Write-Host "  runtime   -> $script:MoonRuntimeDir"
-Write-Host "  stdlib    -> $script:MoonStdlibDir"
+Write-Host ""
+Write-Host "Moon installed:" -ForegroundColor Green
+Write-Host ("  moon.exe  -> {0}" -f $script:MoonExePath)
+Write-Host ("  runtime   -> {0}" -f $script:MoonRuntimeDir)
+Write-Host ("  stdlib    -> {0}" -f $script:MoonStdlibDir)
+Write-Host ""
 Write-Host "Restart terminal or VS Code to pick up PATH changes." -ForegroundColor Yellow

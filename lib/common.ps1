@@ -252,15 +252,187 @@ function Select-EditorCli {
     return $editors[$index]
 }
 
-function Test-MoonExtensionInstalled([string]$EditorCommand) {
+function Invoke-EditorCli {
+    param(
+        [string]$EditorCommand,
+        [string[]]$Arguments
+    )
     $saved = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        $list = & $EditorCommand --list-extensions 2>&1 | ForEach-Object { "$_" }
+        $output = & $EditorCommand @Arguments 2>&1 | ForEach-Object { "$_" }
+        return @{
+            ExitCode = $LASTEXITCODE
+            Output = $output
+        }
     } finally {
         $ErrorActionPreference = $saved
     }
-    return $list | Where-Object { $_ -match "moon-lang\.vscode-moon|vscode-moon" } | Select-Object -First 1
+}
+
+function Get-EditorProcessName([string]$EditorId) {
+    switch ($EditorId) {
+        "code" { return "Code" }
+        "code-insiders" { return "Code - Insiders" }
+        "cursor" { return "Cursor" }
+    }
+    return $null
+}
+
+function Test-EditorRunning([string]$EditorId) {
+    $name = Get-EditorProcessName $EditorId
+    if (-not $name) { return $false }
+    return [bool](Get-Process -Name $name -ErrorAction SilentlyContinue)
+}
+
+function Test-MoonExtensionInstalled([string]$EditorCommand) {
+    $result = Invoke-EditorCli $EditorCommand @("--list-extensions")
+    return $result.Output | Where-Object { $_ -match "moon-lang\.vscode-moon|vscode-moon" } | Select-Object -First 1
+}
+
+function Get-MoonExtensionInfo([string]$EditorCommand) {
+    $result = Invoke-EditorCli $EditorCommand @("--list-extensions", "--show-versions")
+    $line = $result.Output | Where-Object { $_ -match "^moon-lang\.vscode-moon@" } | Select-Object -First 1
+    if (-not $line) { return $null }
+    if ($line -match "^(.+)@(.+)$") {
+        return [pscustomobject]@{ Id = $Matches[1]; Version = $Matches[2] }
+    }
+    return $null
+}
+
+function Get-MoonVsixVersion([string]$Path) {
+    $name = Split-Path $Path -Leaf
+    if ($name -match "vscode-moon-([\d.]+)\.vsix") { return $Matches[1] }
+    return $null
+}
+
+function Get-MoonVsixPackage {
+    param([string]$VsixPath = "")
+
+    if ($VsixPath -and (Test-Path $VsixPath)) {
+        return [pscustomobject]@{
+            Path = $VsixPath
+            Version = Get-MoonVsixVersion $VsixPath
+        }
+    }
+
+    Write-Step "Downloading latest moon-vscode release"
+    $release = Invoke-RestMethod -Uri $script:MoonVscodeReleaseApi -Headers $script:GhHeaders
+    $asset = $release.assets | Where-Object { $_.name -like "vscode-moon-*.vsix" } | Select-Object -First 1
+    if (-not $asset) { throw "No .vsix asset in latest release" }
+    $path = Join-Path $env:TEMP $asset.name
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $path -Headers $script:GhHeaders
+    return [pscustomobject]@{
+        Path = $path
+        Version = Get-MoonVsixVersion $asset.name
+        ReleaseTag = $release.tag_name
+    }
+}
+
+function Wait-EditorClosed {
+    param(
+        [string]$EditorId,
+        [string]$Label,
+        [switch]$NonInteractive
+    )
+
+    if (-not (Test-EditorRunning $EditorId)) { return $true }
+
+    Write-Host ""
+    Write-Host "$Label is running. Close it completely before installing the extension." -ForegroundColor Yellow
+    if ($NonInteractive) {
+        Write-Host "Skipping extension install while editor is open." -ForegroundColor Yellow
+        return $false
+    }
+
+    while (Test-EditorRunning $EditorId) {
+        $choice = Read-Host "Close $Label, then press Enter to retry (S to skip)"
+        if ($choice -match '^[sS]') { return $false }
+    }
+    Start-Sleep -Seconds 1
+    return $true
+}
+
+function Write-ExtensionManualInstallHint {
+    param(
+        [string]$Label,
+        [string]$EditorCommand,
+        [string]$VsixPath
+    )
+    Write-Host ("Close {0} completely, then run:" -f $Label) -ForegroundColor Yellow
+    Write-Host ('  {0} --install-extension "{1}"' -f $EditorCommand, $VsixPath) -ForegroundColor White
+}
+
+function Install-MoonVscodeExtension {
+    param(
+        [string]$VsixPath = "",
+        [string]$Editor = "",
+        [switch]$NonInteractive,
+        [switch]$Force,
+        [switch]$Strict
+    )
+
+    $selected = Select-EditorCli -Prefer $Editor -NonInteractive:$NonInteractive
+    if (-not $selected) {
+        Write-Host "No VS Code / Cursor CLI found - skipping extension install." -ForegroundColor Yellow
+        Write-Host "Install VS Code, VS Code Insiders, or Cursor with CLI in PATH." -ForegroundColor Yellow
+        return [pscustomobject]@{ Success = $false; Skipped = $true; Message = "No editor CLI" }
+    }
+
+    $package = Get-MoonVsixPackage -VsixPath $VsixPath
+    $installed = Get-MoonExtensionInfo $selected.Command
+
+    if ($installed -and $package.Version -and $installed.Version -eq $package.Version -and -not $Force) {
+        Write-Host ('Moon extension {0} already installed in {1}.' -f $installed.Version, $selected.Label) -ForegroundColor Green
+        return [pscustomobject]@{ Success = $true; Skipped = $true; Message = "Already installed" }
+    }
+
+    if (Test-EditorRunning $selected.Id) {
+        $ready = Wait-EditorClosed -EditorId $selected.Id -Label $selected.Label -NonInteractive:$NonInteractive
+        if (-not $ready) {
+            Write-ExtensionManualInstallHint $selected.Label $selected.Command $package.Path
+            return [pscustomobject]@{
+                Success = $false
+                Skipped = $true
+                NeedsRestart = $true
+                VsixPath = $package.Path
+                Editor = $selected
+                Message = "Editor running"
+            }
+        }
+    }
+
+    $verb = if ($installed) { "Updating" } else { "Installing" }
+    Write-Step ('{0} {1} into {2}' -f $verb, (Split-Path $package.Path -Leaf), $selected.Label)
+    $result = Invoke-EditorCli $selected.Command @("--install-extension", $package.Path, "--force")
+
+    if ($result.ExitCode -eq 0) {
+        Write-Host ('Moon extension installed in {0}.' -f $selected.Label) -ForegroundColor Green
+        return [pscustomobject]@{ Success = $true; Skipped = $false; Message = "Installed" }
+    }
+
+    $output = ($result.Output -join "`n")
+    $needsRestart = $output -match "restart|EPERM|operation not permitted|rename failed"
+
+    Write-Host "Extension install failed." -ForegroundColor Red
+    if ($needsRestart) {
+        Write-ExtensionManualInstallHint $selected.Label $selected.Command $package.Path
+    } elseif ($output) {
+        Write-Host $output -ForegroundColor DarkGray
+    }
+
+    $resultObj = [pscustomobject]@{
+        Success = $false
+        Skipped = $false
+        NeedsRestart = $needsRestart
+        VsixPath = $package.Path
+        Editor = $selected
+        Message = "Install failed"
+        ExitCode = $result.ExitCode
+    }
+
+    if ($Strict) { throw "Extension install failed (exit $($result.ExitCode))" }
+    return $resultObj
 }
 
 function Uninstall-MoonUserPath {

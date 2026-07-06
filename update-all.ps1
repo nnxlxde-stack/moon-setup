@@ -10,20 +10,22 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$bootstrapEntry = if ($PSScriptRoot) {
-    Join-Path $PSScriptRoot "lib\bootstrap.ps1"
-} else {
-    $staging = Join-Path $env:TEMP "moon-setup"
-    $path = Join-Path $staging "lib\bootstrap.ps1"
-    if (-not (Test-Path $path)) {
-        New-Item -ItemType Directory -Force -Path (Join-Path $staging "lib") | Out-Null
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/nnxlxde-stack/moon-setup/main/lib/bootstrap.ps1" `
-            -OutFile $path -UseBasicParsing -Headers @{ "User-Agent" = "moon-setup" }
+if (-not (Get-Command Import-MoonSetupBootstrap -ErrorAction SilentlyContinue)) {
+    if ($PSScriptRoot) {
+        . (Join-Path $PSScriptRoot "lib\bootstrap.ps1")
+    } else {
+        $staging = Join-Path $env:TEMP "moon-setup"
+        $bootstrapPath = Join-Path $staging "lib\bootstrap.ps1"
+        if (-not (Test-Path $bootstrapPath)) {
+            New-Item -ItemType Directory -Force -Path (Join-Path $staging "lib") | Out-Null
+            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/nnxlxde-stack/moon-setup/main/lib/bootstrap.ps1" `
+                -OutFile $bootstrapPath -UseBasicParsing -Headers @{ "User-Agent" = "moon-setup" }
+        }
+        . $bootstrapPath
     }
-    $path
 }
-. $bootstrapEntry
-$Root = Initialize-MoonSetupRoot -CallerScriptRoot $PSScriptRoot
+
+$Root = Import-MoonSetupBootstrap -CallerScriptRoot $PSScriptRoot
 
 & (Join-Path $Root "scripts\update-moon.ps1") -Tag $Tag
 if (-not $SkipVscode) {

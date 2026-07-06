@@ -2,6 +2,7 @@
 $script:MoonSetupBootstrapFiles = @(
     "lib/common.ps1",
     "lib/bootstrap.ps1",
+    "lib/tui.ps1",
     "scripts/install-moon.ps1",
     "scripts/install-vscode.ps1",
     "scripts/update-moon.ps1",
@@ -10,6 +11,11 @@ $script:MoonSetupBootstrapFiles = @(
     "scripts/uninstall-vscode.ps1",
     "scripts/verify.ps1"
 )
+
+function Import-MoonSetupBootstrap {
+    param([string]$CallerScriptRoot = "")
+    return Initialize-MoonSetupRoot -CallerScriptRoot $CallerScriptRoot
+}
 
 function Resolve-MoonSetupRoot {
     $fromLib = Split-Path $PSScriptRoot -Parent

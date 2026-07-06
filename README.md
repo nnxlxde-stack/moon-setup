@@ -24,7 +24,17 @@ irm https://raw.githubusercontent.com/nnxlxde-stack/moon-setup/main/update-all.p
 irm https://raw.githubusercontent.com/nnxlxde-stack/moon-setup/main/uninstall-all.ps1 | iex
 ```
 
-Расширение ставится в **VS Code**, **VS Code Insiders** или **Cursor** - CLI ищется автоматически (`code`, `code-insiders`, `cursor`). Если найдено несколько редакторов, скрипт предложит выбор. Явный выбор:
+**Интерактивный менеджер (TUI):**
+
+```powershell
+irm https://raw.githubusercontent.com/nnxlxde-stack/moon-setup/main/moon-manage.ps1 | iex
+```
+
+Расширение ставится в **VS Code**, **VS Code Insiders** или **Cursor** - CLI ищется автоматически (`code`, `code-insiders`, `cursor`). Если найдено несколько редакторов, скрипт предложит выбор.
+
+Если редактор запущен, установка расширения будет отложена - закройте VS Code/Cursor и повторите, либо выполните команду, которую покажет скрипт.
+
+Явный выбор:
 
 ```powershell
 # после git clone:
@@ -67,6 +77,7 @@ chmod +x install-all.sh scripts/*.sh
 
 | Скрипт | Описание |
 |--------|----------|
+| `moon-manage.ps1` | Интерактивное меню: установка, обновление, удаление |
 | `install-all.ps1` | Установка moon + расширение VS Code |
 | `update-all.ps1` | Обновление moon + расширение |
 | `uninstall-all.ps1` | Удаление moon + расширение |
