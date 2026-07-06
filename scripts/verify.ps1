@@ -1,10 +1,16 @@
 . "$PSScriptRoot\..\lib\common.ps1"
-$InstallDir = Join-Path $env:USERPROFILE "moon"
-$MoonExe = Join-Path $InstallDir "moon-lang\.build\debug\moon.exe"
 
 Write-Step "Verifying Moon installation"
-if (Test-Path $MoonExe) {
-    & $MoonExe version
+
+$moon = $script:MoonExePath
+if (Test-Path $moon) {
+    $savedPath = $env:Path
+    $env:Path = "$script:MoonBinDir;$script:MoonRuntimeDir;$savedPath"
+    & $moon version
+    if ($env:MOON_STDLIB -or (Test-Path $script:MoonStdlibDir)) {
+        $stdlib = if ($env:MOON_STDLIB) { $env:MOON_STDLIB } else { $script:MoonStdlibDir }
+        Write-Host "MOON_STDLIB: $stdlib" -ForegroundColor Green
+    }
 } elseif (Get-Command moon -ErrorAction SilentlyContinue) {
     moon version
 } else {

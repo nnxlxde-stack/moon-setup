@@ -1,30 +1,24 @@
 param(
-    [string]$InstallDir = (Join-Path $env:USERPROFILE "moon"),
-    [switch]$Update
+    [string]$Tag = "",
+    [switch]$SkipRuntime,
+    [switch]$SkipStdlib
 )
 . "$PSScriptRoot\..\lib\common.ps1"
-Ensure-Git
-Ensure-Swift
 
-$LangDir = Join-Path $InstallDir "moon-lang"
-Write-Step "Moon toolchain -> $LangDir"
+Write-Step "Moon standalone install -> $script:MoonInstallRoot"
 
-if (Test-Path $LangDir) {
-    if ($Update) {
-        Push-Location $LangDir
-        git pull
-        Pop-Location
-    }
-} else {
-    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    git clone $MoonLangRepo $LangDir
+if (-not $SkipRuntime) {
+    Install-MoonRuntime -Tag $Tag
 }
+Install-MoonBinary -Tag $Tag
+if (-not $SkipStdlib) {
+    $stdlibTag = if ($Tag) { $Tag } else { "v0.3.0" }
+    Install-MoonStdlib -Tag $stdlibTag
+}
+Install-MoonUserPath
 
-Push-Location $LangDir
-swift build
-$MoonExe = Join-Path $LangDir ".build\debug\moon.exe"
-if (-not (Test-Path $MoonExe)) { throw "moon build failed" }
-& $MoonExe version
-Pop-Location
-
-Write-Host "Add to PATH: $MoonExe" -ForegroundColor Green
+Write-Host "`nMoon installed:" -ForegroundColor Green
+Write-Host "  moon.exe  -> $script:MoonExePath"
+Write-Host "  runtime   -> $script:MoonRuntimeDir"
+Write-Host "  stdlib    -> $script:MoonStdlibDir"
+Write-Host "Restart terminal or VS Code to pick up PATH changes." -ForegroundColor Yellow

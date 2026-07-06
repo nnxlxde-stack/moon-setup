@@ -4,18 +4,28 @@
 
 ## Быстрая установка
 
-### Windows (PowerShell)
+### Windows (PowerShell) — рекомендуется
+
+```powershell
+irm https://raw.githubusercontent.com/nnxlxde-stack/moon-setup/main/install-all.ps1 | iex
+```
+
+Устанавливает в `%APPDATA%\Moon`:
+
+| Путь | Содержимое |
+|------|------------|
+| `bin\moon.exe` | CLI из [moon-lang Releases](https://github.com/nnxlxde-stack/moon-lang/releases/latest) |
+| `runtime\bin\` | Swift runtime DLLs (без отдельной установки Swift) |
+| `stdlib\` | Стандартная библиотека Moon |
+
+Добавляет `bin` и `runtime\bin` в **PATH пользователя**. Перезапустите терминал / VS Code.
+
+### Локальный запуск
 
 ```powershell
 git clone https://github.com/nnxlxde-stack/moon-setup.git
 cd moon-setup
 .\install-all.ps1
-```
-
-После публикации:
-
-```powershell
-irm https://raw.githubusercontent.com/nnxlxde-stack/moon-setup/main/install-all.ps1 | iex
 ```
 
 ### macOS / Linux
