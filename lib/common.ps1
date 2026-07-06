@@ -11,6 +11,7 @@ $script:MoonRuntimeDir = Join-Path $script:MoonInstallRoot "runtime\bin"
 $script:MoonStdlibDir = Join-Path $script:MoonInstallRoot "stdlib"
 $script:MoonExePath = Join-Path $script:MoonBinDir "moon.exe"
 $script:GhHeaders = @{ "User-Agent" = "moon-setup" }
+$script:MoonExtensionId = "moon-lang.vscode-moon"
 
 function Write-Step([string]$Message) {
     Write-Host "==> $Message" -ForegroundColor Cyan
@@ -34,6 +35,21 @@ function Expand-ZipArchive([string]$ZipPath, [string]$Destination) {
 
 function Ensure-Directory([string]$Path) {
     New-Item -ItemType Directory -Force -Path $Path | Out-Null
+}
+
+function Remove-UserPathEntry([string]$Dir) {
+    if (-not $Dir) { return }
+    $normalized = $Dir
+    if (Test-Path $Dir) {
+        $normalized = (Resolve-Path $Dir).Path
+    }
+    $current = [Environment]::GetEnvironmentVariable("Path", "User")
+    if (-not $current) { return }
+    $parts = $current -split ';' | Where-Object {
+        $_ -and $_.Trim() -ne "" -and $_.Trim() -ne $normalized
+    }
+    $updated = ($parts -join ';').TrimEnd(';')
+    [Environment]::SetEnvironmentVariable("Path", $updated, "User")
 }
 
 function Add-UserPathEntry([string]$Dir) {
@@ -237,6 +253,39 @@ function Select-EditorCli {
 }
 
 function Test-MoonExtensionInstalled([string]$EditorCommand) {
-    $list = & $EditorCommand --list-extensions 2>$null
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $list = & $EditorCommand --list-extensions 2>&1 | ForEach-Object { "$_" }
+    } finally {
+        $ErrorActionPreference = $saved
+    }
     return $list | Where-Object { $_ -match "moon-lang\.vscode-moon|vscode-moon" } | Select-Object -First 1
+}
+
+function Uninstall-MoonUserPath {
+    Remove-UserPathEntry $script:MoonBinDir
+    Remove-UserPathEntry $script:MoonRuntimeDir
+    $stdlib = [Environment]::GetEnvironmentVariable("MOON_STDLIB", "User")
+    if ($stdlib -and $stdlib -like "*\Moon\stdlib*") {
+        [Environment]::SetEnvironmentVariable("MOON_STDLIB", $null, "User")
+    }
+    Write-Host "Removed Moon entries from user PATH and MOON_STDLIB." -ForegroundColor Green
+}
+
+function Uninstall-MoonFiles {
+    if (Test-Path $script:MoonInstallRoot) {
+        Remove-Item $script:MoonInstallRoot -Recurse -Force
+        Write-Host "Removed $script:MoonInstallRoot" -ForegroundColor Green
+    } else {
+        Write-Host "Moon install directory not found: $script:MoonInstallRoot" -ForegroundColor Yellow
+    }
+}
+
+function Update-MoonToolchain([string]$Tag = "") {
+    Install-MoonRuntime -Tag $Tag
+    Install-MoonBinary -Tag $Tag
+    $stdlibTag = if ($Tag) { $Tag } else { "v0.3.0" }
+    Install-MoonStdlib -Tag $stdlibTag
+    Install-MoonUserPath
 }

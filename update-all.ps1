@@ -1,5 +1,5 @@
-# Moon ecosystem installer (Windows)
-# Usage: irm https://raw.githubusercontent.com/nnxlxde-stack/moon-setup/main/install-all.ps1 | iex
+# Moon ecosystem updater (Windows)
+# Usage: irm https://raw.githubusercontent.com/nnxlxde-stack/moon-setup/main/update-all.ps1 | iex
 param(
     [switch]$SkipVscode,
     [string]$Tag = "",
@@ -25,9 +25,9 @@ $bootstrapEntry = if ($PSScriptRoot) {
 . $bootstrapEntry
 $Root = Initialize-MoonSetupRoot -CallerScriptRoot $PSScriptRoot
 
-& (Join-Path $Root "scripts\install-moon.ps1") -Tag $Tag
+& (Join-Path $Root "scripts\update-moon.ps1") -Tag $Tag
 if (-not $SkipVscode) {
-    & (Join-Path $Root "scripts\install-vscode.ps1") -Editor $Editor -NonInteractive:$NonInteractive
+    & (Join-Path $Root "scripts\update-vscode.ps1") -Editor $Editor -NonInteractive:$NonInteractive
 }
 & (Join-Path $Root "scripts\verify.ps1")
 Write-Host "`nDone. Docs: https://nnxlxde-stack.github.io/moon-lang/" -ForegroundColor Green
