@@ -138,3 +138,105 @@ function Install-MoonStdlib([string]$Tag = "v0.3.0") {
     $env:MOON_STDLIB = $script:MoonStdlibDir
     Write-Host "MOON_STDLIB=$script:MoonStdlibDir" -ForegroundColor Green
 }
+
+function Find-EditorInstallations {
+    $defs = @(
+        @{
+            Id = "code-insiders"
+            Label = "VS Code Insiders"
+            Names = @("code-insiders")
+            Paths = @(
+                (Join-Path $env:LOCALAPPDATA "Programs\Microsoft VS Code Insiders\bin\code-insiders.cmd")
+            )
+        },
+        @{
+            Id = "cursor"
+            Label = "Cursor"
+            Names = @("cursor")
+            Paths = @(
+                (Join-Path $env:LOCALAPPDATA "Programs\cursor\resources\app\bin\cursor.cmd")
+                (Join-Path $env:LOCALAPPDATA "Programs\Cursor\resources\app\bin\cursor.cmd")
+            )
+        },
+        @{
+            Id = "code"
+            Label = "VS Code"
+            Names = @("code")
+            Paths = @(
+                (Join-Path $env:LOCALAPPDATA "Programs\Microsoft VS Code\bin\code.cmd")
+            )
+        }
+    )
+
+    $found = @()
+    foreach ($def in $defs) {
+        $command = $null
+        foreach ($name in $def.Names) {
+            $resolved = Get-Command $name -ErrorAction SilentlyContinue
+            if ($resolved) {
+                $command = $resolved.Source
+                break
+            }
+        }
+        if (-not $command) {
+            foreach ($candidate in $def.Paths) {
+                if (Test-Path $candidate) {
+                    $command = $candidate
+                    break
+                }
+            }
+        }
+        if ($command) {
+            $found += [pscustomobject]@{
+                Id = $def.Id
+                Label = $def.Label
+                Command = $command
+            }
+        }
+    }
+    return $found
+}
+
+function Select-EditorCli {
+    param(
+        [string]$Prefer = "",
+        [switch]$NonInteractive
+    )
+
+    $editors = Find-EditorInstallations
+    if ($editors.Count -eq 0) { return $null }
+
+    if ($Prefer) {
+        $preferred = $editors | Where-Object { $_.Id -eq $Prefer } | Select-Object -First 1
+        if ($preferred) { return $preferred }
+        Write-Host "Editor '$Prefer' not found; showing available editors." -ForegroundColor Yellow
+    }
+
+    if ($editors.Count -eq 1) {
+        Write-Host "Using editor: $($editors[0].Label)" -ForegroundColor Green
+        return $editors[0]
+    }
+
+    if ($NonInteractive) {
+        Write-Host "Using editor: $($editors[0].Label) (non-interactive)" -ForegroundColor Green
+        return $editors[0]
+    }
+
+    Write-Host ""
+    Write-Host "Multiple editors found:" -ForegroundColor Cyan
+    for ($i = 0; $i -lt $editors.Count; $i++) {
+        Write-Host "  [$($i + 1)] $($editors[$i].Label)"
+    }
+    $default = 1
+    $choice = Read-Host "Select editor [1-$($editors.Count)] (default $default)"
+    if ([string]::IsNullOrWhiteSpace($choice)) { $choice = "$default" }
+    if ($choice -notmatch '^\d+$') { $choice = "$default" }
+    $index = [int]$choice - 1
+    if ($index -lt 0 -or $index -ge $editors.Count) { $index = 0 }
+    return $editors[$index]
+}
+
+function Test-MoonExtensionInstalled([string]$EditorCommand) {
+    $list = & $EditorCommand --list-extensions 2>$null
+    return $list | Where-Object { $_ -match "moon-lang\.vscode-moon|vscode-moon" } | Select-Object -First 1
+}

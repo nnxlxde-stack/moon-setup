@@ -10,6 +10,18 @@
 irm https://raw.githubusercontent.com/nnxlxde-stack/moon-setup/main/install-all.ps1 | iex
 ```
 
+Расширение ставится в **VS Code**, **VS Code Insiders** или **Cursor** — CLI ищется автоматически (`code`, `code-insiders`, `cursor`). Если найдено несколько редакторов, скрипт предложит выбор. Явный выбор:
+
+```powershell
+# после git clone:
+.\install-all.ps1 -Editor code-insiders
+
+# только moon, без расширения:
+.\install-all.ps1 -SkipVscode
+```
+
+Через `irm | iex` параметры не передаются — при нескольких редакторах появится интерактивный выбор.
+
 Устанавливает в `%APPDATA%\Moon`:
 
 | Путь | Содержимое |

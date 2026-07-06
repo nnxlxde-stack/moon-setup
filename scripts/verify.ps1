@@ -17,8 +17,16 @@ if (Test-Path $moon) {
     Write-Host "moon CLI not found. Run install-moon.ps1 first." -ForegroundColor Yellow
 }
 
-if (Get-Command code -ErrorAction SilentlyContinue) {
-    $ext = code --list-extensions 2>$null | Select-String "moon-lang.vscode-moon|vscode-moon"
-    if ($ext) { Write-Host "VS Code extension: $ext" -ForegroundColor Green }
-    else { Write-Host "Moon VS Code extension not installed." -ForegroundColor Yellow }
+$editors = Find-EditorInstallations
+if ($editors.Count -eq 0) {
+    Write-Host "No VS Code / Cursor CLI found." -ForegroundColor Yellow
+} else {
+    foreach ($editor in $editors) {
+        $ext = Test-MoonExtensionInstalled $editor.Command
+        if ($ext) {
+            Write-Host "$($editor.Label): Moon extension installed ($ext)" -ForegroundColor Green
+        } else {
+            Write-Host "$($editor.Label): Moon extension not installed." -ForegroundColor Yellow
+        }
+    }
 }

@@ -2,7 +2,10 @@
 # Usage: irm https://raw.githubusercontent.com/nnxlxde-stack/moon-setup/main/install-all.ps1 | iex
 param(
     [switch]$SkipVscode,
-    [string]$Tag = ""
+    [string]$Tag = "",
+    [ValidateSet("", "code", "code-insiders", "cursor")]
+    [string]$Editor = "",
+    [switch]$NonInteractive
 )
 
 $ErrorActionPreference = "Stop"
@@ -38,7 +41,7 @@ function Resolve-MoonSetupRoot {
 $Root = Resolve-MoonSetupRoot
 & (Join-Path $Root "scripts\install-moon.ps1") -Tag $Tag
 if (-not $SkipVscode) {
-    & (Join-Path $Root "scripts\install-vscode.ps1")
+    & (Join-Path $Root "scripts\install-vscode.ps1") -Editor $Editor -NonInteractive:$NonInteractive
 }
 & (Join-Path $Root "scripts\verify.ps1")
 Write-Host "`nDone. Docs: https://nnxlxde-stack.github.io/moon-lang/" -ForegroundColor Green
